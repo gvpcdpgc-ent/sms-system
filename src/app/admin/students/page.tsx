@@ -193,6 +193,7 @@ export default function StudentsPage() {
 
             let successCount = 0;
             let failCount = 0;
+            const importErrors: string[] = [];
 
             for (const row of data) {
                 // Map Names to IDs
@@ -215,7 +216,10 @@ export default function StudentsPage() {
                 const finalSecId = secId || (secName.length > 10 ? secName : "");
 
                 if (!finalDeptId || !finalSecId) {
-                    console.warn(`Skipping row: Missing Dept/Section ID layout for`, row);
+                    const rowName = String(row['Name'] || row['name'] || "Unknown");
+                    const errorMsg = `Row ${row['Roll Number'] || '?'}: Invalid Dept '${deptName}' or Section '${secName}'`;
+                    console.warn(errorMsg, row);
+                    if (failCount < 5) importErrors.push(errorMsg); // Use a local array to store reasons
                     failCount++;
                     continue;
                 }
@@ -230,19 +234,34 @@ export default function StudentsPage() {
                     departmentId: finalDeptId
                 };
 
-                if (!studentPayload.rollNumber) continue;
+                if (!studentPayload.rollNumber) {
+                    failCount++;
+                    continue;
+                }
 
                 const res = await fetch("/api/students", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(studentPayload)
                 });
-                if (res.ok) successCount++;
-                else failCount++;
+                if (res.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                    const data = await res.json();
+                    if (failCount < 5) importErrors.push(`Roll ${studentPayload.rollNumber}: ${data.error || "Failed to save"}`);
+                }
             }
-            setStatus({ type: "success", message: `Import complete. ${successCount} imported. ${failCount} failed.` });
+
+            let statusMessage = `Import complete. ${successCount} imported. ${failCount} failed.`;
+            if (failCount > 0 && importErrors.length > 0) {
+                statusMessage += " Errors: " + importErrors.join(", ") + (failCount > 5 ? "..." : "");
+            }
+
+            setStatus({ type: failCount > 0 ? "error" : "success", message: statusMessage });
             fetchStudents();
-            setTimeout(() => setStatus({ type: null, message: "" }), 5000);
+            // Don't auto-clear if there are errors so user can read them
+            if (failCount === 0) setTimeout(() => setStatus({ type: null, message: "" }), 5000);
         };
         reader.readAsBinaryString(file);
     };
