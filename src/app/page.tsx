@@ -308,9 +308,9 @@ export default function Home() {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className={`text-lg font-bold ${isSelected ? activeColor : 'text-slate-900'}`}>{student.name}</h4>
-                        <span className={`mt-1 inline-block rounded md:px-2 md:py-0.5 px-0 py-0 text-xs font-mono font-medium ${isSelected ? 'bg-white/50 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
-                          {student.rollNumber}
+                        <h4 className={`text-lg font-bold font-mono ${isSelected ? activeColor : 'text-slate-900'}`}>{student.rollNumber}</h4>
+                        <span className={`mt-1 inline-block text-sm font-medium ${isSelected ? 'text-slate-700' : 'text-slate-500'}`}>
+                          {student.name}
                         </span>
                       </div>
                       <div className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${isSelected
