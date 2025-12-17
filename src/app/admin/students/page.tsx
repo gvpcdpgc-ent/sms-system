@@ -192,15 +192,42 @@ export default function StudentsPage() {
             const data: any[] = XLSX.utils.sheet_to_json(ws);
 
             let successCount = 0;
+            let failCount = 0;
+
             for (const row of data) {
+                // Map Names to IDs
+                const deptName = row['DepartmentId'] || row['Dept'] || row['department'] || "";
+                const secName = row['SectionId'] || row['Section'] || row['Sec'] || row['section'] || "";
+
+                // Find ID by Name (Case Insensitive)
+                const deptId = departments.find(d =>
+                    d.name.toLowerCase() === deptName.toLowerCase() ||
+                    d.code.toLowerCase() === deptName.toLowerCase()
+                )?.id;
+
+                const secId = sections.find(s =>
+                    s.name.toLowerCase() === secName.toLowerCase()
+                )?.id;
+
+                // Fallback: If ID is provided directly (UUID-like), use it.
+                // Otherwise checking if ID match failed.
+                const finalDeptId = deptId || (deptName.length > 10 ? deptName : "");
+                const finalSecId = secId || (secName.length > 10 ? secName : "");
+
+                if (!finalDeptId || !finalSecId) {
+                    console.warn(`Skipping row: Missing Dept/Section ID layout for`, row);
+                    failCount++;
+                    continue;
+                }
+
                 const studentPayload = {
                     rollNumber: String(row['Roll Number'] || row['Roll'] || row['rollNumber']),
                     name: String(row['Name'] || row['name']),
                     mobile: String(row['Mobile'] || row['Phone'] || row['mobile']),
                     year: String(row['Year'] || row['year']),
                     semester: String(row['Semester'] || row['Sem'] || row['semester']),
-                    sectionId: String(row['SectionId'] || row['Section'] || row['Sec'] || row['section']),
-                    departmentId: String(row['DepartmentId'] || row['Dept'] || row['department'])
+                    sectionId: finalSecId,
+                    departmentId: finalDeptId
                 };
 
                 if (!studentPayload.rollNumber) continue;
@@ -211,17 +238,18 @@ export default function StudentsPage() {
                     body: JSON.stringify(studentPayload)
                 });
                 if (res.ok) successCount++;
+                else failCount++;
             }
-            setStatus({ type: "success", message: `Import complete. ${successCount} students imported.` });
+            setStatus({ type: "success", message: `Import complete. ${successCount} imported. ${failCount} failed.` });
             fetchStudents();
-            setTimeout(() => setStatus({ type: null, message: "" }), 3000);
+            setTimeout(() => setStatus({ type: null, message: "" }), 5000);
         };
         reader.readAsBinaryString(file);
     };
 
     const downloadSample = () => {
         const headers = [
-            { "Roll Number": "21131A0501", "Name": "John Doe", "Mobile": "9876543210", "Year": "1", "Semester": "1", "Section": "A" }
+            { "Roll Number": "21131A0501", "Name": "John Doe", "Mobile": "9876543210", "Year": "1", "Semester": "1", "Section": "A", "Department": "CSE" }
         ];
         const ws = XLSX.utils.json_to_sheet(headers);
         const wb = XLSX.utils.book_new();
@@ -236,7 +264,8 @@ export default function StudentsPage() {
             "Mobile": s.mobile,
             "Year": s.year,
             "Semester": s.semester,
-            "Section": s.section
+            "Section": (typeof s.section === 'object' ? (s.section as any)?.name : s.section) || "",
+            "Department": (typeof s.department === 'object' ? (s.department as any)?.code : s.department) || ""
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
