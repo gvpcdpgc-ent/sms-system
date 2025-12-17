@@ -179,91 +179,128 @@ export default function StudentsPage() {
         setIsModalOpen(true);
     };
 
+    // Import Status State
+    const [importStatus, setImportStatus] = useState<{
+        isOpen: boolean;
+        loading: boolean;
+        successCount: number;
+        failCount: number;
+        errors: string[];
+    }>({
+        isOpen: false,
+        loading: false,
+        successCount: 0,
+        failCount: 0,
+        errors: []
+    });
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-            const bstr = evt.target?.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
-            const data: any[] = XLSX.utils.sheet_to_json(ws);
+        // Reset and Open Modal
+        setImportStatus({
+            isOpen: true,
+            loading: true,
+            successCount: 0,
+            failCount: 0,
+            errors: []
+        });
 
-            let successCount = 0;
-            let failCount = 0;
-            const importErrors: string[] = [];
+        // Use setTimeout to allow UI to render the modal before heavy processing blocks thread
+        setTimeout(() => {
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const bstr = evt.target?.result;
+                    const wb = XLSX.read(bstr, { type: 'binary' });
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    const data: any[] = XLSX.utils.sheet_to_json(ws);
 
-            for (const row of data) {
-                // Map Names to IDs
-                const deptName = row['Department'] || row['DepartmentId'] || row['Dept'] || row['department'] || "";
-                const secName = row['Section'] || row['SectionId'] || row['Sec'] || row['section'] || "";
+                    let successCount = 0;
+                    let failCount = 0;
+                    const importErrors: string[] = [];
 
-                // Find ID by Name (Case Insensitive)
-                const deptId = departments.find(d =>
-                    d.name.toLowerCase() === deptName.toLowerCase() ||
-                    d.code.toLowerCase() === deptName.toLowerCase()
-                )?.id;
+                    for (const row of data) {
+                        // Map Names to IDs
+                        const deptName = row['Department'] || row['DepartmentId'] || row['Dept'] || row['department'] || "";
+                        const secName = row['Section'] || row['SectionId'] || row['Sec'] || row['section'] || "";
 
-                const secId = sections.find(s =>
-                    s.name.toLowerCase() === secName.toLowerCase()
-                )?.id;
+                        // Find ID by Name (Case Insensitive)
+                        const deptId = departments.find(d =>
+                            d.name.toLowerCase() === deptName.toLowerCase() ||
+                            d.code.toLowerCase() === deptName.toLowerCase()
+                        )?.id;
 
-                // Fallback: If ID is provided directly (UUID-like), use it.
-                // Otherwise checking if ID match failed.
-                const finalDeptId = deptId || (deptName.length > 10 ? deptName : "");
-                const finalSecId = secId || (secName.length > 10 ? secName : "");
+                        const secId = sections.find(s =>
+                            s.name.toLowerCase() === secName.toLowerCase()
+                        )?.id;
 
-                if (!finalDeptId || !finalSecId) {
-                    const rowName = String(row['Name'] || row['name'] || "Unknown");
-                    const errorMsg = `Row ${row['Roll Number'] || '?'}: Invalid Dept '${deptName}' or Section '${secName}'`;
-                    console.warn(errorMsg, row);
-                    if (failCount < 5) importErrors.push(errorMsg); // Use a local array to store reasons
-                    failCount++;
-                    continue;
+                        const finalDeptId = deptId || (deptName.length > 10 ? deptName : "");
+                        const finalSecId = secId || (secName.length > 10 ? secName : "");
+
+                        if (!finalDeptId || !finalSecId) {
+                            const rowName = String(row['Name'] || row['name'] || "Unknown");
+                            const errorMsg = `Row ${row['Roll Number'] || '?'}: Invalid Dept '${deptName}' or Section '${secName}'`;
+                            if (failCount < 20) importErrors.push(errorMsg); // Limit displayed errors
+                            failCount++;
+                            continue;
+                        }
+
+                        const studentPayload = {
+                            rollNumber: String(row['Roll Number'] || row['Roll'] || row['rollNumber']),
+                            name: String(row['Name'] || row['name']),
+                            mobile: String(row['Mobile'] || row['Phone'] || row['mobile']),
+                            year: String(row['Year'] || row['year']),
+                            semester: String(row['Semester'] || row['Sem'] || row['semester']),
+                            sectionId: finalSecId,
+                            departmentId: finalDeptId
+                        };
+
+                        if (!studentPayload.rollNumber) {
+                            failCount++;
+                            continue;
+                        }
+
+                        const res = await fetch("/api/students", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(studentPayload)
+                        });
+                        if (res.ok) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                            const data = await res.json();
+                            if (failCount < 20) importErrors.push(`Roll ${studentPayload.rollNumber}: ${data.error || "Failed to save"}`);
+                        }
+                    }
+
+                    setImportStatus({
+                        isOpen: true,
+                        loading: false, // Done
+                        successCount,
+                        failCount,
+                        errors: importErrors
+                    });
+
+                    fetchStudents();
+                    // Clear file input
+                    e.target.value = "";
+                } catch (error) {
+                    console.error("Import error:", error);
+                    setImportStatus({
+                        isOpen: true,
+                        loading: false,
+                        successCount: 0,
+                        failCount: 0,
+                        errors: ["Critial error reading file. Please check format."]
+                    });
                 }
-
-                const studentPayload = {
-                    rollNumber: String(row['Roll Number'] || row['Roll'] || row['rollNumber']),
-                    name: String(row['Name'] || row['name']),
-                    mobile: String(row['Mobile'] || row['Phone'] || row['mobile']),
-                    year: String(row['Year'] || row['year']),
-                    semester: String(row['Semester'] || row['Sem'] || row['semester']),
-                    sectionId: finalSecId,
-                    departmentId: finalDeptId
-                };
-
-                if (!studentPayload.rollNumber) {
-                    failCount++;
-                    continue;
-                }
-
-                const res = await fetch("/api/students", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(studentPayload)
-                });
-                if (res.ok) {
-                    successCount++;
-                } else {
-                    failCount++;
-                    const data = await res.json();
-                    if (failCount < 5) importErrors.push(`Roll ${studentPayload.rollNumber}: ${data.error || "Failed to save"}`);
-                }
-            }
-
-            let statusMessage = `Import complete. ${successCount} imported. ${failCount} failed.`;
-            if (failCount > 0 && importErrors.length > 0) {
-                statusMessage += " Errors: " + importErrors.join(", ") + (failCount > 5 ? "..." : "");
-            }
-
-            setStatus({ type: failCount > 0 ? "error" : "success", message: statusMessage });
-            fetchStudents();
-            // Don't auto-clear if there are errors so user can read them
-            if (failCount === 0) setTimeout(() => setStatus({ type: null, message: "" }), 5000);
-        };
-        reader.readAsBinaryString(file);
+            };
+            reader.readAsBinaryString(file);
+        }, 100);
     };
 
     const downloadSample = () => {
@@ -526,6 +563,62 @@ export default function StudentsPage() {
                 confirmText="Delete"
                 isDangerous={true}
             />
+
+            {/* Import Status Modal */}
+            <Modal
+                isOpen={importStatus.isOpen}
+                onClose={() => {
+                    // Only allow closing if not loading
+                    if (!importStatus.loading) {
+                        setImportStatus({ ...importStatus, isOpen: false });
+                    }
+                }}
+                title={importStatus.loading ? "Importing Students..." : "Import Results"}
+            >
+                <div className="space-y-4">
+                    {importStatus.loading ? (
+                        <div className="flex flex-col items-center justify-center py-8">
+                            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+                            <p className="text-slate-600 font-medium">Processing your file...</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex gap-4">
+                                <div className="flex-1 rounded-lg bg-green-50 p-4 text-center border border-green-100">
+                                    <p className="text-2xl font-bold text-green-600">{importStatus.successCount}</p>
+                                    <p className="text-sm font-medium text-green-800">Imported</p>
+                                </div>
+                                <div className={`flex-1 rounded-lg p-4 text-center border ${importStatus.failCount > 0 ? "bg-red-50 border-red-100" : "bg-slate-50 border-slate-100"}`}>
+                                    <p className={`text-2xl font-bold ${importStatus.failCount > 0 ? "text-red-600" : "text-slate-600"}`}>{importStatus.failCount}</p>
+                                    <p className={`text-sm font-medium ${importStatus.failCount > 0 ? "text-red-800" : "text-slate-800"}`}>Failed</p>
+                                </div>
+                            </div>
+
+                            {importStatus.errors.length > 0 && (
+                                <div>
+                                    <p className="mb-2 text-sm font-semibold text-slate-700">Error Details:</p>
+                                    <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                                        <ul className="list-inside list-disc space-y-1 text-red-600">
+                                            {importStatus.errors.map((err, idx) => (
+                                                <li key={idx} className="break-words">{err}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={() => setImportStatus({ ...importStatus, isOpen: false })}
+                                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Modal>
         </div>
     );
 }

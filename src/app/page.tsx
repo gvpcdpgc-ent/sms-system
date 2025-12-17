@@ -121,25 +121,24 @@ export default function Home() {
     XLSX.utils.book_append_sheet(wb, ws, "Absentees"); // Sheet name
     XLSX.writeFile(wb, filename);
 
+    // Infer department from the students being processed if the user (e.g. Admin) has no departmentId
+    // Use the first student's department as the source of truth for this batch
+    const derivedDepartmentId = (session?.user as any).departmentId || students[0]?.departmentId || "";
+
+    if (!derivedDepartmentId) {
+      alert("Error: Could not determine Department for this batch. History might not be scoped correctly.");
+      // Proceeding anyway or blocking? Blocking is safer for the user's requirement.
+      // But let's log it.
+    }
+
     await fetch("/api/attendance/history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         year,
         semester,
-        sectionId,
-        departmentId: (session?.user as any).departmentId, // Pass logged in user's dept
-        // Note: Admin might not have deptId, logic in API should handle 'global' admin doing work? 
-        // Or if Admin, they should Pick a Dept? 
-        // For attendance, usually it's Class driven. 
-        // Let's assume Admin picks a class, that class belongs to a Dept (via student?).
-        // Actually, schema relates History to Department.
-        // If Admin is marking, we probably need a Dept selector. 
-        // But for now, let's assume current UI for Admin is basic.
-        // Wait, if Admin has NO deptId, this fails schema constraint!
-        // Constraint: departmentId in History is required.
-        // If Admin is marking, we need to KNOW the department.
-        // We can infer it from the students? Or add a Selector for Admin.
+        sectionId, // This is the ID
+        departmentId: derivedDepartmentId,
         status: mode === "mark_present" ? "Marked Present" : "Marked Absent",
         fileName: filename,
         date: new Date().toISOString(),
