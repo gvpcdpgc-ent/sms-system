@@ -56,7 +56,14 @@ export default function LoginPage() {
                 className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/5"
             >
                 <div className="bg-blue-600 p-8 text-center">
-                    <h1 className="text-3xl font-bold text-white">GVP SMS</h1>
+                    <div className="mb-4 flex justify-center">
+                        <img
+                            src="https://gvpcdpgc.edu.in/gvplogo.jpg"
+                            alt="GVP Logo"
+                            className="h-20 w-20 rounded-full border-4 border-white object-cover bg-white"
+                        />
+                    </div>
+                    <h1 className="text-3xl font-bold text-white">GVPCDPGC(A)</h1>
                     <p className="mt-2 text-blue-100">Student Attendance Management</p>
                 </div>
 
@@ -100,9 +107,7 @@ export default function LoginPage() {
                         </button>
                     </form>
                 </div>
-                <div className="bg-slate-50 px-8 py-4 border-t border-slate-100 text-center">
-                    <p className="text-xs text-slate-500">© 2024 Gayatri Vidya Parishad</p>
-                </div>
+                {/* Footer removed to avoid duplication with global footer */}
             </motion.div>
         </div>
     );

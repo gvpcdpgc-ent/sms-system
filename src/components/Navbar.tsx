@@ -48,7 +48,7 @@ export default function Navbar() {
                     <div className="flex h-16 items-center justify-between">
                         {/* Logo */}
                         <Link href="/" className="flex items-center gap-2">
-                            <span className="text-xl font-bold tracking-tight text-slate-900">GVP<span className="text-blue-600">SMS</span></span>
+                            <span className="text-xl font-bold tracking-tight text-slate-900">GVPCDPGC<span className="text-blue-600">(A)</span></span>
                         </Link>
 
                         {/* Desktop Menu */}
