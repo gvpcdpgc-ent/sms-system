@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique // CSE, CSM
+  code      String   @unique
+  createdAt DateTime @default(now())
+  
+  users     User[]
+  students  Student[]
+  history   AttendanceHistory[]
+  alumni    Alumni[]
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  name      String   @unique // A, B, C
+  createdAt DateTime @default(now())
+
+  students  Student[]
+  history   AttendanceHistory[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  password     String
+  role         String   @default("USER") // ADMIN, USER, HOD
+  
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  downloads    AttendanceHistory[]
+}
+
+model Student {
+  id           String   @id @default(uuid())
+  rollNumber   String   @unique
+  name         String
+  mobile       String
+  year         String
+  semester     String
+  
+  sectionId    String
+  section      Section @relation(fields: [sectionId], references: [id])
+
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AttendanceHistory {
+  id           String   @id @default(uuid())
+  date         DateTime @default(now())
+  year         String
+  semester     String
+  
+  sectionId    String
+  section      Section @relation(fields: [sectionId], references: [id])
+
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  status       String   // "Marked Present" or "Marked Absent"
+  fileName     String
+  downloadedBy String
+  user         User     @relation(fields: [downloadedBy], references: [id])
+  details      String   @default("[]") // JSON string of student data for re-download
+}
+
+model Alumni {
+  id          String   @id @default(uuid())
+  rollNumber  String   @unique
+  name        String
+  mobile      String
+  passingYear String   // e.g., "2024"
+  
+  departmentId String? // Made optional for flexibility, but seed will populate
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  createdAt   DateTime @default(now())
+}
