@@ -196,8 +196,8 @@ export default function StudentsPage() {
 
             for (const row of data) {
                 // Map Names to IDs
-                const deptName = row['DepartmentId'] || row['Dept'] || row['department'] || "";
-                const secName = row['SectionId'] || row['Section'] || row['Sec'] || row['section'] || "";
+                const deptName = row['Department'] || row['DepartmentId'] || row['Dept'] || row['department'] || "";
+                const secName = row['Section'] || row['SectionId'] || row['Sec'] || row['section'] || "";
 
                 // Find ID by Name (Case Insensitive)
                 const deptId = departments.find(d =>
