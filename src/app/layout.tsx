@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: "GVP Student Management System",
   description: "Manage student attendance and records",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/app-icon.jpg",
+    apple: "/app-icon.jpg",
+  },
 };
 
 export default function RootLayout({

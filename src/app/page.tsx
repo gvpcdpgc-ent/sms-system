@@ -12,9 +12,10 @@ export default function Home() {
   const [year, setYear] = useState("");
   const [semester, setSemester] = useState("");
   const [section, setSection] = useState("");
-  // Change state to store Section ID, but for UI we might need name too.
-  // Actually API expects sectionId now.
   const [sectionId, setSectionId] = useState("");
+  // Admin specific
+  const [departmentId, setDepartmentId] = useState("");
+  const [departments, setDepartments] = useState<any[]>([]);
 
   const [sections, setSections] = useState<any[]>([]);
 
@@ -28,11 +29,19 @@ export default function Home() {
 
   useEffect(() => {
     fetchSections();
-  }, []);
+    if (session?.user.role === "ADMIN") {
+      fetchDepartments();
+    }
+  }, [session]);
 
   const fetchSections = async () => {
     const res = await fetch("/api/sections");
     if (res.ok) setSections(await res.json());
+  };
+
+  const fetchDepartments = async () => {
+    const res = await fetch("/api/departments");
+    if (res.ok) setDepartments(await res.json());
   };
 
   useEffect(() => {
@@ -47,19 +56,38 @@ export default function Home() {
   }
 
   useEffect(() => {
+    // Only fetch if required fields are selected
+    // For Admin: Year, Sem, Section AND Department are usually needed to be specific? 
+    // Or at least Year/Sem/Section.
+    // If Admin doesn't select Dept, the API might search across all?
+    // Let's enforce Dept selection for Admin to avoid confusion or massive lists
+
+    const isAdmin = session?.user.role === "ADMIN";
+
     if (year && semester && sectionId) {
+      if (isAdmin && !departmentId) {
+        // Optionally wait for dept? 
+        // API says: if admin & no deptId => returns all students in that year/sem/section (across depts if duplicated sections exist?)
+        // Ideally sections are unique or scoped?
+        // In this app, Section A might exist in CSE and ECE.
+        // So Admin MUST select Department to get correct list.
+        return;
+      }
       fetchStudents();
     } else {
       setStudents([]);
     }
-  }, [year, semester, sectionId]);
+  }, [year, semester, sectionId, departmentId, session]);
 
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/students?year=${year}&semester=${semester}&sectionId=${sectionId}`
-      );
+      let url = `/api/students?year=${year}&semester=${semester}&sectionId=${sectionId}`;
+      if (departmentId) {
+        url += `&departmentId=${departmentId}`;
+      }
+
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setStudents(data);
@@ -121,14 +149,11 @@ export default function Home() {
     XLSX.utils.book_append_sheet(wb, ws, "Absentees"); // Sheet name
     XLSX.writeFile(wb, filename);
 
-    // Infer department from the students being processed if the user (e.g. Admin) has no departmentId
-    // Use the first student's department as the source of truth for this batch
-    const derivedDepartmentId = (session?.user as any).departmentId || students[0]?.departmentId || "";
+    const derivedDepartmentId = (session?.user as any).departmentId || departmentId || students[0]?.departmentId || "";
 
     if (!derivedDepartmentId) {
-      alert("Error: Could not determine Department for this batch. History might not be scoped correctly.");
-      // Proceeding anyway or blocking? Blocking is safer for the user's requirement.
-      // But let's log it.
+      alert("Error: Could not determine Department for this batch.");
+      console.error("Missing Department ID for History");
     }
 
     await fetch("/api/attendance/history", {
@@ -137,12 +162,12 @@ export default function Home() {
       body: JSON.stringify({
         year,
         semester,
-        sectionId, // This is the ID
+        sectionId,
         departmentId: derivedDepartmentId,
         status: mode === "mark_present" ? "Marked Present" : "Marked Absent",
         fileName: filename,
         date: new Date().toISOString(),
-        details: JSON.stringify(absenteeData) // Send details for re-download
+        details: JSON.stringify(absenteeData)
       }),
     });
   };
@@ -172,7 +197,23 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-4">
+          {session?.user.role === "ADMIN" && (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Department</label>
+              <select
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+              >
+                <option value="">Select Department</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">Academic Year</label>
             <select
