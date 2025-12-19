@@ -15,12 +15,18 @@ export async function PUT(
 
     try {
         const body = await request.json();
+        const sectionConnect = body.sectionIds ? body.sectionIds.map((id: string) => ({ id })) : [];
+
         const department = await prisma.department.update({
             where: { id: params.id },
             data: {
                 name: body.name,
                 code: body.code,
+                sections: {
+                    set: sectionConnect // Replace existing links with new list
+                }
             },
+            include: { sections: true }
         });
         return NextResponse.json(department);
     } catch (error) {

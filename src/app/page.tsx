@@ -28,14 +28,31 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    fetchSections();
     if (session?.user.role === "ADMIN") {
       fetchDepartments();
     }
   }, [session]);
 
-  const fetchSections = async () => {
-    const res = await fetch("/api/sections");
+  // Derived Department ID (Admin's selection OR HOD's assigned)
+  const effectiveDepartmentId = session?.user.role === "ADMIN" ? departmentId : (session?.user as any)?.departmentId;
+
+  // Re-fetch sections whenever the effective department changes
+  useEffect(() => {
+    if (session) {
+      if (session.user.role === "ADMIN" && !departmentId) {
+        setSections([]); // Clear sections if no department selected
+      } else {
+        fetchSections(effectiveDepartmentId);
+      }
+    }
+  }, [effectiveDepartmentId, session]);
+
+  const fetchSections = async (deptId?: string) => {
+    let url = "/api/sections";
+    if (deptId) {
+      url += `?departmentId=${deptId}`;
+    }
+    const res = await fetch(url);
     if (res.ok) setSections(await res.json());
   };
 
@@ -57,20 +74,10 @@ export default function Home() {
 
   useEffect(() => {
     // Only fetch if required fields are selected
-    // For Admin: Year, Sem, Section AND Department are usually needed to be specific? 
-    // Or at least Year/Sem/Section.
-    // If Admin doesn't select Dept, the API might search across all?
-    // Let's enforce Dept selection for Admin to avoid confusion or massive lists
-
     const isAdmin = session?.user.role === "ADMIN";
 
     if (year && semester && sectionId) {
       if (isAdmin && !departmentId) {
-        // Optionally wait for dept? 
-        // API says: if admin & no deptId => returns all students in that year/sem/section (across depts if duplicated sections exist?)
-        // Ideally sections are unique or scoped?
-        // In this app, Section A might exist in CSE and ECE.
-        // So Admin MUST select Department to get correct list.
         return;
       }
       fetchStudents();

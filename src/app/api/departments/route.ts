@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 export async function GET() {
     try {
         const departments = await prisma.department.findMany({
+            include: { sections: true },
             orderBy: { name: 'asc' }
         });
         return NextResponse.json(departments);
@@ -22,11 +23,17 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
+        const sectionConnect = body.sectionIds ? body.sectionIds.map((id: string) => ({ id })) : [];
+
         const dept = await prisma.department.create({
             data: {
                 name: body.name,
-                code: body.code
-            }
+                code: body.code,
+                sections: {
+                    connect: sectionConnect
+                }
+            },
+            include: { sections: true }
         });
         return NextResponse.json(dept);
     } catch (error) {

@@ -17,6 +17,8 @@ model Department {
   students  Student[]
   history   AttendanceHistory[]
   alumni    Alumni[]
+  
+  sections  Section[] // Many-to-Many
 }
 
 model Section {
@@ -26,6 +28,8 @@ model Section {
 
   students  Student[]
   history   AttendanceHistory[]
+  
+  departments Department[] // Many-to-Many
 }
 
 model User {

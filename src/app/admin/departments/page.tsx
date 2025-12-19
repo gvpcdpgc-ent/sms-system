@@ -13,6 +13,7 @@ interface Department {
 
 export default function DepartmentsPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [allSections, setAllSections] = useState<any[]>([]); // Pool of all sections
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Edit/Delete State
@@ -20,12 +21,13 @@ export default function DepartmentsPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
 
-    const [formData, setFormData] = useState({ name: "", code: "" });
+    const [formData, setFormData] = useState({ name: "", code: "", sectionIds: [] as string[] });
     const [status, setStatus] = useState<{ type: "success" | "error" | null, message: string }>({ type: null, message: "" });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         fetchDepartments();
+        fetchSections();
     }, []);
 
     const fetchDepartments = async () => {
@@ -33,16 +35,31 @@ export default function DepartmentsPage() {
         if (res.ok) setDepartments(await res.json());
     };
 
+    const fetchSections = async () => {
+        const res = await fetch("/api/sections");
+        if (res.ok) setAllSections(await res.json());
+    };
+
     const openAddModal = () => {
         setEditingDepartment(null);
-        setFormData({ name: "", code: "" });
+        setFormData({ name: "", code: "", sectionIds: [] });
         setIsModalOpen(true);
     };
 
-    const openEditModal = (dept: Department) => {
+    const openEditModal = (dept: any) => {
         setEditingDepartment(dept);
-        setFormData({ name: dept.name, code: dept.code });
+        const linkedSectionIds = dept.sections ? dept.sections.map((s: any) => s.id) : [];
+        setFormData({ name: dept.name, code: dept.code, sectionIds: linkedSectionIds });
         setIsModalOpen(true);
+    };
+
+    const handleSectionToggle = (sectionId: string) => {
+        setFormData(prev => {
+            const current = new Set(prev.sectionIds);
+            if (current.has(sectionId)) current.delete(sectionId);
+            else current.add(sectionId);
+            return { ...prev, sectionIds: Array.from(current) };
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -62,7 +79,7 @@ export default function DepartmentsPage() {
 
             if (res.ok) {
                 setStatus({ type: "success", message: `Department ${editingDepartment ? "updated" : "created"} successfully!` });
-                setFormData({ name: "", code: "" });
+                setFormData({ name: "", code: "", sectionIds: [] });
                 setEditingDepartment(null);
                 fetchDepartments();
                 setTimeout(() => {
@@ -133,7 +150,7 @@ export default function DepartmentsPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {departments.map((dept) => (
+                {departments.map((dept: any) => (
                     <div key={dept.id} className="relative rounded-xl border border-slate-200 bg-white p-6 shadow-sm group hover:border-indigo-300 transition-all">
                         <div className="flex items-center justify-between mb-2">
                             <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
@@ -157,7 +174,19 @@ export default function DepartmentsPage() {
                             </div>
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">{dept.name}</h3>
-                        {/* Hidden ID as requested */}
+
+                        {/* Show Linked Sections Count */}
+                        <div className="mt-2 flex flex-wrap gap-1">
+                            {dept.sections && dept.sections.length > 0 ? (
+                                dept.sections.map((sec: any) => (
+                                    <span key={sec.id} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                                        {sec.name}
+                                    </span>
+                                ))
+                            ) : (
+                                <span className="text-xs text-slate-400 italic">No sections linked</span>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>
@@ -194,6 +223,26 @@ export default function DepartmentsPage() {
                             required
                         />
                     </div>
+
+                    {/* Section Linking */}
+                    <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">Available Sections</label>
+                        <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 max-h-40 overflow-y-auto">
+                            {allSections.map((sec) => (
+                                <label key={sec.id} className="flex cursor-pointer items-center gap-2 rounded p-1 hover:bg-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.sectionIds.includes(sec.id)}
+                                        onChange={() => handleSectionToggle(sec.id)}
+                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm text-slate-700">{sec.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">Select sections applicable to this department.</p>
+                    </div>
+
                     <div className="flex justify-end pt-4">
                         <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                             {editingDepartment ? "Save Changes" : "Create Department"}

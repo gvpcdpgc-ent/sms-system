@@ -3,9 +3,20 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const departmentId = searchParams.get("departmentId");
+
+    const where: any = {};
+    if (departmentId) {
+        where.departments = {
+            some: { id: departmentId }
+        };
+    }
+
     try {
         const sections = await prisma.section.findMany({
+            where,
             orderBy: { name: 'asc' }
         });
         return NextResponse.json(sections);
