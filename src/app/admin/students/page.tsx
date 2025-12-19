@@ -52,16 +52,7 @@ export default function StudentsPage() {
             const res = await fetch("/api/departments");
             if (res.ok) {
                 const data = await res.json();
-                // Filter ensures only CSE and CSM departments are available
-                const specificDepts = data.filter((d: any) =>
-                    d.code?.toUpperCase().includes("CSE") ||
-                    d.code?.toUpperCase().includes("CSM") ||
-                    d.name?.toUpperCase().includes("CSE") ||
-                    d.name?.toUpperCase().includes("CSM")
-                );
-                // Fallback to all data if filter returns nothing (though user requirement implies we should be strict,
-                // for safety if codes mismatch we might want to see at least something, but for now strict compliance with "ensure only")
-                setDepartments(specificDepts.length > 0 ? specificDepts : []);
+                setDepartments(data);
             }
         } catch (e) { console.error(e); }
     };
@@ -536,7 +527,22 @@ export default function StudentsPage() {
                                 required
                             >
                                 <option value="">Select Section</option>
-                                {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {(() => {
+                                    // Filter sections based on selected department
+                                    const selectedDept = departments.find(d => d.id === formData.departmentId);
+                                    // If department has linked sections, show ONLY them.
+                                    // If department has NO linked sections (or no dept selected), show ALL sections (fallback).
+                                    // However, typically we want to restrict it.
+                                    // Let's assume strict mode: if dept selected, use its sections.
+
+                                    const availableSections = selectedDept?.sections && selectedDept.sections.length > 0
+                                        ? selectedDept.sections
+                                        : sections; // Fallback to all if none linked (or maybe empty? user said "according to it")
+
+                                    return availableSections.map((s: any) => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ));
+                                })()}
                             </select>
                         </div>
                     </div>

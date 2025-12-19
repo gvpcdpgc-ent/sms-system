@@ -39,13 +39,7 @@ export default function AdminUsersPage() {
             const res = await fetch("/api/departments");
             if (res.ok) {
                 const data = await res.json();
-                const filtered = data.filter((d: any) =>
-                    d.code?.toUpperCase().includes("CSE") ||
-                    d.code?.toUpperCase().includes("CSM") ||
-                    d.name?.toUpperCase().includes("CSE") ||
-                    d.name?.toUpperCase().includes("CSM")
-                );
-                setDepartments(filtered.length > 0 ? filtered : data);
+                setDepartments(data);
             }
         } catch (error) {
             console.error(error);
